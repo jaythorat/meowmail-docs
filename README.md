@@ -1,8 +1,11 @@
-# MeowMail developer docs (`docs.meowmail.in`)
+# MeowMail developer docs
 
-Mintlify-hosted documentation for the public API at `/api/v1`. Deployed by
-Mintlify from this folder on push; there is no build step in our own pipeline and
-nothing here ships in the frontend bundle.
+Source for **[docs.meowmail.in](https://docs.meowmail.in)** — the developer
+documentation for the free MeowMail temporary-email API.
+
+Built and hosted by [Mintlify](https://mintlify.com), deployed automatically on
+push to `main`. This repo is public so Mintlify and doc contributors can read it;
+the service itself lives in a separate private repo.
 
 ## Layout
 
@@ -10,7 +13,7 @@ nothing here ships in the frontend bundle.
 |---|---|
 | `docs.json` | Site config: theme, colors, navigation, OpenAPI source |
 | `*.mdx` | The guide. One page per concept, matching `navigation` in `docs.json` |
-| `logo/`, `favicon.svg` | Brand assets, copied from `frontend/public/` |
+| `logo/`, `favicon.svg` | Brand assets |
 
 ## The API reference is not written by hand
 
@@ -20,36 +23,47 @@ nothing here ships in the frontend bundle.
 "openapi": "https://api.meowmail.in/api/v1/openapi.json"
 ```
 
-Not a committed copy, and not a relative path to `priv/openapi.json`. This is
-deliberate: it makes drift structurally impossible, because the reference is
-always generated from exactly what the API is serving. The previous
-self-hosted setup kept a second copy of the spec and it drifted within a day.
+Not a committed copy of the spec, and not a path into another repo. This is the
+reason a separate docs repo costs nothing: the endpoint reference is always
+generated from exactly what the API is serving, so it cannot drift from the
+service even though the two live in different repositories. An earlier setup kept
+a second copy of the spec alongside the docs and it drifted within a day.
 
-**Consequence for ordering:** a spec change appears in the docs only after the
-backend is deployed. Deploy the API first, then push docs. If Mintlify builds
-while the API is unreachable, the build fails rather than publishing a reference
-for endpoints that do not exist — which is the behaviour we want.
+**Consequences of that choice:**
 
-## Editing
+- A spec change appears here only after the API is deployed. Deploy the service
+  first, then push docs.
+- If Mintlify builds while `api.meowmail.in` is unreachable, the build fails
+  rather than publishing a reference for endpoints that do not exist. That is the
+  behaviour we want.
 
-Prose lives here as MDX. Endpoint schemas live in `priv/openapi.json` at the repo
-root — edit them there, never here.
+## What lives where
 
-Local preview:
+| Change | Where to make it |
+|---|---|
+| Guide prose, navigation, theme | **Here**, in the `.mdx` files and `docs.json` |
+| Endpoint schemas, parameters, response shapes | The service repo, in `priv/openapi.json` — never here |
+| Anything about how the API behaves | The service repo |
+
+If you are editing an endpoint's request or response documentation and you are in
+this repo, you are in the wrong place.
+
+## Local preview
 
 ```bash
-npm i -g mint     # Mintlify CLI
-cd docs-site
+npm i -g mint
 mint dev          # http://localhost:3000
 ```
 
 ## Custom domain
 
-`docs.meowmail.in` needs a CNAME record pointing at the target Mintlify shows in
-its dashboard, plus the domain registered there. On Cloudflare the record must be
-DNS-only (grey cloud), not proxied. See `docs/DEPLOYMENT_GUIDE.md`.
+`docs.meowmail.in` is a CNAME pointing at the target shown in the Mintlify
+dashboard, with the domain registered there. On Cloudflare the record must be
+DNS-only (grey cloud), not proxied, or Mintlify cannot complete certificate
+issuance.
 
-## Why Mintlify
+## Contributing
 
-Recorded in `docs/PUBLIC_API_PLAN.md` §7, including what was tried first
-(self-hosted Scalar on the apex) and why it was removed.
+Corrections and clarifications are welcome — open a PR. For anything that
+requires the API itself to change, or to report abuse or request higher rate
+limits, email dev.jaythorat@gmail.com.
