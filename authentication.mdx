@@ -1,0 +1,93 @@
+---
+title: "Authentication"
+description: "Read endpoints work with no credentials. A free API key raises your limits and unlocks long-polling."
+icon: "key"
+---
+
+Read endpoints work with no credentials at all — you can call the API right now
+with nothing but `curl`. A free API key raises your limits 5-10× and unlocks
+long-polling, which is the feature you actually want.
+
+## Getting a key
+
+```bash
+curl -X POST https://api.meowmail.in/api/v1/keys \
+  -H 'content-type: application/json' \
+  -d '{"label":"my-e2e-tests","contact_email":"you@example.com"}'
+```
+
+Both fields are optional. `label` is for your own benefit when you have several.
+`contact_email` is unverified and is the only way we can warn you before a
+breaking change.
+
+<Warning>
+The key is shown **once** and is not recoverable. Store it before you close the
+terminal. Minting is limited to 3 keys per IP per day.
+</Warning>
+
+## Sending it
+
+Either header works, pick one:
+
+```bash
+curl -H "Authorization: Bearer mm_your_key_here" ...
+curl -H "X-API-Key: mm_your_key_here" ...
+```
+
+<Note>
+Omit the header entirely for anonymous access. Sending an **invalid** key is an
+error (`unauthorized`, 401) rather than a silent downgrade to the anonymous
+tier — a typo'd key should fail loudly, not quietly cost you your limits.
+</Note>
+
+## An API key is not an account
+
+There is no password, no login, no profile, and we ask for no personal data.
+
+A key exists for exactly two reasons: so requests can be attributed for fair-use
+accounting, and so one misbehaving integration can be switched off without
+banning an IP range that honest users share. It is a bearer token for rate
+accounting, not an identity.
+
+This is also why keyless access stays allowed. A "free public API" that refuses a
+plain `curl` is a bad first impression, so the incentive to get a key is the
+higher limits — not a wall.
+
+## Checking what you have
+
+`GET /api/v1/me` reports your tier, limits, and current usage, and does not
+consume quota:
+
+```bash
+curl -H "Authorization: Bearer $KEY" https://api.meowmail.in/api/v1/me
+```
+
+```json
+{
+  "data": {
+    "kind": "key",
+    "tier": "free",
+    "label": "my-e2e-tests",
+    "key_prefix": "mm_YTvifuF6",
+    "limits": {
+      "requests_per_minute": 300,
+      "requests_per_day": 10000,
+      "concurrent_waits": 5
+    },
+    "usage": {
+      "requests_this_minute": 3,
+      "requests_today": 3
+    }
+  }
+}
+```
+
+Called without a key it reports the anonymous tier and your per-IP usage, which
+is a quick way to confirm what bucket a CI runner is actually landing in.
+
+## Lost your key?
+
+Mint a new one. There is no recovery flow, because there is no account to
+recover it into — we store a SHA-256 hash, never the key itself. If a key leaks,
+the fix is the same: mint a replacement and email us the leaked prefix so we can
+revoke it.

@@ -1,0 +1,65 @@
+---
+title: "Fair use"
+description: "No contract, no SLA — just a request to be reasonable so this can stay free."
+icon: "scale-balanced"
+---
+
+MeowMail is a free service run by one person on a single server. There is no
+contract and no SLA. What follows is not legalese, it is the actual basis on
+which the API stays open.
+
+<CardGroup cols={2}>
+  <Card title="Please do" icon="circle-check">
+    - use it in test suites, CI pipelines, and internal tooling
+    - use long-polling instead of tight loops
+    - purge inboxes you are done with
+    - cache the domain list rather than fetching it per request
+    - back off when you get a 429
+  </Card>
+  <Card title="Please don't" icon="circle-xmark">
+    - use it for fraud, spam, or evading bans and abuse controls
+    - resell it, or wrap it in a paid product as the backing service
+    - mint keys in bulk to sidestep rate limits
+    - scrape or enumerate inboxes you did not create
+    - use it to receive anything sensitive
+  </Card>
+</CardGroup>
+
+## Purging is the one courtesy that matters
+
+Everything expires on its own after about an hour, so nothing leaks forever if
+you forget. But a test suite that creates hundreds of inboxes and leaves them
+full costs storage for an hour each, for no reason.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $KEY" \
+  "https://api.meowmail.in/api/v1/inboxes/$ADDR/emails"
+```
+
+One call in your teardown. That is the whole ask.
+
+## Revocation
+
+Keys are revocable at any time, without notice, if an integration is degrading
+the service for everyone else. In practice that means sustained tight polling
+after 429s, bulk key minting, or traffic that looks like abuse rather than
+testing.
+
+If you are doing something unusual but legitimate and high-volume, tell us first
+and it stops looking like abuse.
+
+## No warranty
+
+Service is provided as-is, with no warranty and no guarantee of availability or
+data retention. Do not put anything on the critical path of a production system
+that you cannot afford to have fail.
+
+Given that inboxes are public and mail is deleted within the hour, that should
+already be obvious — but it is worth stating plainly.
+
+## Contact
+
+Abuse to report, a legitimate need for higher limits, or a leaked key to revoke:
+[dev.jaythorat@gmail.com](mailto:dev.jaythorat@gmail.com?subject=MeowMail%20API).
+
+See also the [privacy policy](https://meowmail.in/privacy).

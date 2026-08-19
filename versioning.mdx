@@ -1,0 +1,51 @@
+---
+title: "Versioning & stability"
+description: "What we promise not to change, and how breaking changes will reach you."
+icon: "code-branch"
+---
+
+Everything under `/api/v1` is a published contract.
+
+**We will:** add endpoints, add fields to responses, add optional parameters, and
+reword error messages.
+
+**We will not:** remove or rename an endpoint, remove or rename a field, change
+what an existing field means, or change a status code or an error `type`.
+
+Anything genuinely breaking ships as `/api/v2`, with `v1` kept running through a
+deprecation window.
+
+<Warning>
+Treat new response fields as expected, not exceptional. Do not write parsers that
+reject unknown keys, and do not assert on exact response shapes in tests — a
+strict schema validator against our responses will break on an additive change
+that every other consumer absorbs silently.
+</Warning>
+
+## How you find out
+
+If you supplied a `contact_email` when minting your key, that is where
+breaking-change notices go. It is the only reason we ask for it, it is
+unverified, and it is optional — but without it we have no way to reach you.
+
+## The internal API is not this
+
+You may notice `meowmail.in` itself calls `/api/*` without a version prefix.
+That surface is **not** part of this contract: it serves the web app and the
+browser extension, and it changes whenever they need it to.
+
+<Warning>
+Do not build against `/api/*`. It has no versioning promise, no stability
+guarantee, and no deprecation window. Everything you need is under `/api/v1`, and
+if something is missing, [ask](mailto:dev.jaythorat@gmail.com?subject=MeowMail%20API)
+rather than reaching for the internal one.
+</Warning>
+
+## Machine-readable
+
+The [OpenAPI 3.1 spec](https://api.meowmail.in/api/v1/openapi.json) is served
+live and is the source these docs are generated from. Import it into Postman or
+Insomnia, or generate a typed client from it.
+
+`GET /api/v1` returns a compact machine-readable index of the surface, which is
+useful for a smoke test that asserts the endpoints you depend on still exist.

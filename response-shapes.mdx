@@ -1,0 +1,78 @@
+---
+title: "Response shapes"
+description: "Envelopes, cursors, timestamps, and the two fields that need care."
+icon: "code"
+---
+
+Successful responses are wrapped in a `data` key, with `meta` added on
+collections:
+
+```json
+{
+  "data": [
+    {
+      "id": "0191f2c4-...",
+      "sender": "noreply@github.com",
+      "subject": "Your verification code is 482910",
+      "received_at": "2026-08-14T10:42:00Z",
+      "has_attachments": false
+    }
+  ],
+  "meta": {
+    "address": "abc@meowmail.in",
+    "count": 1,
+    "next_since": "0191f2c4-...",
+    "next_before": "0191f2c4-...",
+    "waited": true
+  }
+}
+```
+
+Conventions that hold everywhere:
+
+- **Timestamps** are ISO 8601, always UTC.
+- **Email ids** are UUIDv7, which sort chronologically. That property is what
+  makes the `since` / `before` cursors work without a separate sort key.
+- **Deletes** return `204` with no body.
+- **Attachment downloads** return raw bytes, not JSON.
+
+## Two fields that need care
+
+<Warning>
+**`sender` is forgeable.** It is the `From` header exactly as received. We run no
+SPF or DKIM verification on inbound mail, so anyone can claim to be anyone.
+Never make a trust decision based on it — in a test, assert on the code in the
+body, not on who the mail says it came from.
+</Warning>
+
+<Warning>
+**`html_body` is sanitized, but that is not a guarantee.** We strip `<script>`
+tags, embeddable tags (`iframe`, `object`, `embed`, `form`), and `on*` event
+handlers before it leaves the server. That filtering is regex-based and cannot be
+exhaustive, so treat it as defence in depth, not a boundary.
+
+If you render it, render it in a sandboxed iframe without `allow-same-origin` —
+that iframe is the actual boundary. Never `innerHTML` it.
+</Warning>
+
+## Bodies are not in the list response
+
+`GET /api/v1/inboxes/{address}/emails` returns summaries only: id, sender,
+subject, timestamp, and whether attachments exist. Fetch
+`GET /api/v1/emails/{id}` for `text_body`, `html_body`, and attachment metadata.
+
+`text_body` and `html_body` are each `null` when the message carried no such
+part. A message with only an HTML part is common, so always check both before
+running a regex over one of them.
+
+## Pagination
+
+| Parameter | Effect |
+|---|---|
+| `limit` | 1–100, default 25 |
+| `since` | Only emails newer than this id. **Flips ordering to oldest-first.** |
+| `before` | Only emails older than this id. Pages backwards. |
+
+Listing is capped at 100 per response. With a one-hour TTL you are unlikely to
+reach it, but a mail-bombed inbox will, and the cap is what keeps that from
+becoming one enormous response.

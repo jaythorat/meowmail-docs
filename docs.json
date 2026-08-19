@@ -1,0 +1,89 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "MeowMail API",
+  "description": "Free REST API for temporary, disposable email. Create throwaway inboxes and read the mail they receive.",
+  "colors": {
+    "primary": "#f5a623",
+    "light": "#f7b955",
+    "dark": "#a16e14"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/mark-light.svg",
+    "dark": "/logo/mark.svg",
+    "href": "https://meowmail.in"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["introduction", "quickstart", "authentication"]
+          },
+          {
+            "group": "Core concepts",
+            "pages": ["waiting-for-mail", "response-shapes", "errors"]
+          },
+          {
+            "group": "Using it responsibly",
+            "pages": ["rate-limits", "versioning", "fair-use"]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "openapi": "https://api.meowmail.in/api/v1/openapi.json"
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "OpenAPI spec",
+        "href": "https://api.meowmail.in/api/v1/openapi.json"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get an inbox",
+      "href": "https://meowmail.in"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/jaythorat",
+      "website": "https://meowmail.in"
+    },
+    "links": [
+      {
+        "header": "Product",
+        "items": [
+          { "label": "MeowMail", "href": "https://meowmail.in" },
+          { "label": "Blog", "href": "https://meowmail.in/blog" },
+          { "label": "Privacy", "href": "https://meowmail.in/privacy" }
+        ]
+      },
+      {
+        "header": "API",
+        "items": [
+          { "label": "OpenAPI spec", "href": "https://api.meowmail.in/api/v1/openapi.json" },
+          { "label": "Status", "href": "https://api.meowmail.in/api/v1/health" }
+        ]
+      }
+    ]
+  },
+  "seo": {
+    "indexing": "all"
+  }
+}

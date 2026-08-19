@@ -1,0 +1,74 @@
+---
+title: "Errors"
+description: "One envelope, eight machine-readable error types. Branch on type, never on message."
+icon: "triangle-exclamation"
+---
+
+Every error under `/api/v1` uses the same envelope:
+
+```json
+{
+  "error": {
+    "type": "rate_limited",
+    "message": "Rate limit exceeded: 60 requests/minute on the anonymous tier…",
+    "docs": "https://meowmail.in/api"
+  }
+}
+```
+
+<Warning>
+Branch on `type`, never on `message`. Types are a stable contract; messages get
+reworded whenever we find a clearer way to say something, and that is not treated
+as a breaking change.
+</Warning>
+
+## Error types
+
+| `type` | Status | Meaning |
+|---|---|---|
+| `invalid_request` | 400 | Malformed parameters or body |
+| `unauthorized` | 401 | A key was sent but is invalid or revoked. Omit the header entirely for anonymous access |
+| `key_required` | 401 | This feature — currently only `wait` — needs a key. [Create a free one](/authentication) |
+| `not_found` | 404 | No such resource. Most often the email expired |
+| `rate_limited` | 429 | Per-minute limit exceeded |
+| `quota_exceeded` | 429 | Daily quota exhausted |
+| `too_many_waiters` | 429 | This key already has its maximum long-polls in flight |
+| `internal_error` | 500 | Our fault. Retry with backoff |
+
+Three of these are 429s and they mean genuinely different things, so it is worth
+handling them separately:
+
+- `rate_limited` — slow down. `retry-after` tells you by how much.
+- `quota_exceeded` — you are done for the day. Backing off will not help.
+- `too_many_waiters` — you are at your concurrency cap, not your rate limit. Your
+  request rate is fine; you just have 5 long-polls already open. Lower your test
+  parallelism or use more keys.
+
+<Note>
+`not_found` on an email you just read is normal, not a bug. Mail is deleted about
+an hour after arrival, and the API does not distinguish "never existed" from
+"expired" — doing so would leak whether an address had received mail.
+</Note>
+
+## 404s on unknown paths
+
+Every unmatched path under `/api/v1` returns this same envelope rather than a
+framework error page, so you never need a second parser for our errors:
+
+```bash
+curl -s https://api.meowmail.in/api/v1/nope
+```
+
+```json
+{
+  "error": {
+    "type": "not_found",
+    "message": "No such endpoint: GET /api/v1/nope. See https://meowmail.in/api for the endpoint list, or GET /api/v1 for a machine-readable index.",
+    "docs": "https://meowmail.in/api"
+  }
+}
+```
+
+If a path contains an empty segment — `/api/v1/inboxes//emails`, which usually
+means a variable in your request was empty — the message says so explicitly
+instead of leaving you to spot the double slash.

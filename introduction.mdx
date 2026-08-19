@@ -1,0 +1,72 @@
+---
+title: "Introduction"
+description: "Free REST API for temporary email. Create disposable inboxes and read the mail they receive — from your test suite, your script, or your app."
+icon: "cat"
+---
+
+MeowMail gives you throwaway email addresses over HTTP. Create an inbox, point a
+signup form at it, and read the mail that arrives — no account, no billing, no
+credit card.
+
+```bash
+curl -X POST https://api.meowmail.in/api/v1/inboxes \
+  -H 'content-type: application/json' \
+  -d '{"domain":"meowmail.in"}'
+```
+
+**Base URL:** `https://api.meowmail.in`
+
+## Two things to know before you integrate
+
+Neither of these is a bug we intend to fix. They are what makes the service free
+and fast, and they rule out whole categories of use.
+
+<Warning>
+**Inboxes are public.** There is no authorization on inbox contents — anyone who
+knows the address can read it. Never use MeowMail for anything you would mind a
+stranger reading, and never for password resets on accounts that matter.
+</Warning>
+
+<Warning>
+**Mail is ephemeral.** Emails are permanently deleted about one hour after
+arrival. Read what you need immediately: nothing is archived and there are no
+backups.
+</Warning>
+
+## What it's for
+
+This API was built for one job in particular: testing signup and verification
+flows end to end, without a mailbox full of test accounts. It is a good fit when
+you need to
+
+- assert that your app actually sends the welcome or verification email
+- extract a one-time code from a real email in a Playwright or Cypress run
+- register a fresh, isolated account per test case
+- let your users try a feature without handing over a real address
+
+It is **receive-only**. There is no send endpoint, so it cannot be used to
+deliver mail to anyone.
+
+<Card title="Just want an inbox, not an API?" icon="inbox" href="https://meowmail.in">
+  Generate one in the browser — no key, no code.
+</Card>
+
+## Where to go next
+
+Every endpoint, schema, and status code lives under the **API reference** tab
+above, with a playground for trying calls against the live API.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Key, inbox, wait for mail, read it — in four copy-paste steps.
+  </Card>
+  <Card title="Waiting for mail" icon="clock" href="/waiting-for-mail">
+    The one page to read properly. Do not write a polling loop.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Read endpoints need no key at all. Here is why you still want one.
+  </Card>
+  <Card title="OpenAPI spec" icon="code" href="https://api.meowmail.in/api/v1/openapi.json">
+    The machine-readable contract. Import it into Postman, or generate a client.
+  </Card>
+</CardGroup>

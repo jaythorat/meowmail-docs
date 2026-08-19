@@ -1,0 +1,96 @@
+---
+title: "Waiting for mail"
+description: "Long-polling and the cursor contract. Do not write a polling loop."
+icon: "clock"
+---
+
+Every test that checks a verification email needs to answer "has it arrived
+yet?". Doing that with a one-second polling loop is the single worst load pattern
+you could send us, so there is a server-side primitive for it.
+
+Pass `wait` (1–30 seconds) and the server holds the connection until mail
+arrives, returning the instant it does:
+
+```
+GET /api/v1/inboxes/abc@meowmail.in/emails?wait=30&since=<last_id>
+```
+
+This is faster for you and cheaper for us — one held connection replaces thirty
+requests and thirty database queries. It needs an API key, and up to 5 can be in
+flight per key.
+
+<Note>
+There is nothing to install and no library to learn. A held HTTP request works in
+CI, in a shell script, and in every HTTP client in every language — which is
+exactly why long-polling was chosen over SSE or webhooks.
+</Note>
+
+## The cursor contract
+
+This is the part worth reading twice. Get it wrong and you will either miss mail
+or reprocess it.
+
+<Steps>
+  <Step title="Pass `since` with the newest id you have already seen">
+    On the first call you have nothing, so omit it.
+  </Step>
+  <Step title="Feed `meta.next_since` into your next request">
+    Every response echoes a cursor. Use it verbatim; do not compute your own.
+  </Step>
+  <Step title="Keep the cursor across empty responses">
+    A `wait` that times out returns `data: []` **and still echoes your cursor**.
+    Discarding it on an empty response is the classic bug — you rewind and
+    reprocess mail you already handled.
+  </Step>
+</Steps>
+
+<Warning>
+**With `since`, results come back oldest-first.** Without it, newest-first.
+
+That flip is deliberate: it means advancing your cursor to the last item in the
+array can never skip mail that arrived in the same burst. If you assume
+newest-first everywhere, you will silently drop emails whenever two arrive close
+together.
+</Warning>
+
+## Two ways this bites people
+
+<AccordionGroup>
+  <Accordion title="Your client times out before the server answers">
+    If you ask for `wait=30` with a default 10-second client timeout, your own
+    HTTP library hangs up first and you see a timeout error, not an empty result.
+    Set the client timeout above the `wait` value — the Python example uses
+    `timeout=40` for `wait=30` for exactly this reason.
+  </Accordion>
+  <Accordion title="You get `too_many_waiters` unexpectedly">
+    Each key may hold 5 concurrent long-polls. A test suite running with
+    `--parallel 8` against one key will trip this. Either lower the parallelism,
+    mint a key per worker, or catch the 429 and retry — it is a capacity signal,
+    not a failure.
+
+    If you get `key_required` instead, you are calling `wait` anonymously.
+    Long-polling needs a key.
+  </Accordion>
+</AccordionGroup>
+
+## Building in a browser instead?
+
+There is a realtime Phoenix channel that pushes events with no polling at all:
+
+```
+wss://api.meowmail.in/socket
+```
+
+Join the topic `inbox:<local_part>@<domain>` — for example
+`inbox:jay@meowmail.in`. The server pushes `new_email` when mail arrives and
+`email_expired` when it is deleted by TTL.
+
+<Warning>
+You must use the `phoenix` JS client (or an equivalent). A raw `WebSocket` will
+not work, because Phoenix has its own framing protocol on top of the socket. Note
+the scheme is `wss://`, not `ws://` — a page served over HTTPS cannot open an
+insecure socket.
+</Warning>
+
+Long-polling exists because it works everywhere the channel does not: CI, shell
+scripts, and any HTTP client without a Phoenix library.

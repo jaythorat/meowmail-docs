@@ -1,0 +1,182 @@
+---
+title: "Quickstart"
+description: "Get a key, generate an inbox, wait for mail, and read it — in four copy-paste steps."
+icon: "rocket"
+---
+
+Four steps. Everything on this page is copy-paste runnable.
+
+<Steps>
+  <Step title="Get a free key">
+    No signup, no email required. The key is shown once and is not recoverable.
+
+    ```bash
+    curl -X POST https://api.meowmail.in/api/v1/keys \
+      -H 'content-type: application/json' \
+      -d '{"label":"my-e2e-tests"}'
+    # -> {"data":{"api_key":"mm_...", ...}}
+    ```
+
+    <Note>
+    Read endpoints work with no key at all — you can skip this step and still
+    call the API. A key raises your limits 5-10× and unlocks long-polling, which
+    is the feature you actually want. See [Authentication](/authentication).
+    </Note>
+  </Step>
+
+  <Step title="Generate an inbox">
+    ```bash
+    curl -X POST https://api.meowmail.in/api/v1/inboxes \
+      -H "Authorization: Bearer $KEY" \
+      -H 'content-type: application/json' \
+      -d '{"domain":"meowmail.in"}'
+    # -> {"data":{"address":"zw8onqp9@meowmail.in", ...}}
+    ```
+
+    Nothing is provisioned server-side — an address starts receiving the moment
+    it exists. `GET /api/v1/domains` lists the domains that accept mail.
+  </Step>
+
+  <Step title="Wait for mail to arrive">
+    Pass `wait` and the server holds the connection until mail lands, up to 30
+    seconds. No polling loop.
+
+    ```bash
+    curl -H "Authorization: Bearer $KEY" \
+      "https://api.meowmail.in/api/v1/inboxes/zw8onqp9@meowmail.in/emails?wait=30"
+    ```
+
+    <Warning>
+    Set your HTTP client's timeout **above** your `wait` value, or your own
+    client will hang up before the server answers.
+    </Warning>
+  </Step>
+
+  <Step title="Read the full body">
+    The list endpoint returns summaries without bodies. Fetch one email for the
+    text and HTML parts plus attachment metadata.
+
+    ```bash
+    curl -H "Authorization: Bearer $KEY" \
+      "https://api.meowmail.in/api/v1/emails/<id>"
+    ```
+  </Step>
+</Steps>
+
+## A complete verification-code flow
+
+This is the shape almost every integration ends up with: create an inbox, drive
+your own signup, block until the mail arrives, pull the code out.
+
+<CodeGroup>
+
+```js JavaScript
+const BASE = 'https://api.meowmail.in/api/v1'
+const KEY = process.env.MEOWMAIL_KEY
+
+const api = (path, init = {}) =>
+  fetch(BASE + path, {
+    ...init,
+    headers: { Authorization: `Bearer ${KEY}`, 'content-type': 'application/json', ...init.headers },
+  }).then(async (r) => {
+    const body = await r.json()
+    if (!r.ok) throw new Error(body.error?.message ?? r.statusText)
+    return body
+  })
+
+// Create a throwaway inbox
+const { data: inbox } = await api('/inboxes', {
+  method: 'POST',
+  body: JSON.stringify({ domain: 'meowmail.in' }),
+})
+
+// ... trigger your app's signup flow with inbox.address ...
+
+// Block until the verification email lands (up to 30s per call)
+async function waitForEmail(address, { since = null, timeoutMs = 60_000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  let cursor = since
+  while (Date.now() < deadline) {
+    const q = new URLSearchParams({ wait: '30' })
+    if (cursor) q.set('since', cursor)
+    const { data, meta } = await api(
+      `/inboxes/${encodeURIComponent(address)}/emails?${q}`
+    )
+    if (data.length) return data
+    cursor = meta.next_since ?? cursor // keep the cursor across timeouts
+  }
+  throw new Error('No email arrived in time')
+}
+
+const [summary] = await waitForEmail(inbox.address)
+const { data: email } = await api(`/emails/${summary.id}`)
+const code = email.text_body.match(/\d{6}/)?.[0]
+```
+
+```python Python
+import os, re, time, requests
+
+BASE = "https://api.meowmail.in/api/v1"
+session = requests.Session()
+session.headers["Authorization"] = f"Bearer {os.environ['MEOWMAIL_KEY']}"
+
+
+def api(method, path, **kw):
+    r = session.request(method, BASE + path, timeout=40, **kw)
+    if not r.ok:
+        raise RuntimeError(r.json().get("error", {}).get("message", r.text))
+    return r.json()
+
+
+inbox = api("POST", "/inboxes", json={"domain": "meowmail.in"})["data"]
+
+# ... trigger your app's signup flow with inbox["address"] ...
+
+
+def wait_for_email(address, timeout=60):
+    deadline, cursor = time.time() + timeout, None
+    while time.time() < deadline:
+        params = {"wait": 30}
+        if cursor:
+            params["since"] = cursor
+        body = api("GET", f"/inboxes/{address}/emails", params=params)
+        if body["data"]:
+            return body["data"]
+        cursor = body["meta"]["next_since"] or cursor
+    raise TimeoutError("No email arrived in time")
+
+
+summary = wait_for_email(inbox["address"])[0]
+email = api("GET", f"/emails/{summary['id']}")["data"]
+code = re.search(r"\d{6}", email["text_body"]).group()
+```
+
+```bash curl
+KEY=mm_your_key_here
+BASE=https://api.meowmail.in/api/v1
+
+ADDR=$(curl -s -X POST $BASE/inboxes \
+  -H "Authorization: Bearer $KEY" \
+  -H 'content-type: application/json' \
+  -d '{"domain":"meowmail.in"}' | jq -r .data.address)
+
+echo "inbox: $ADDR"
+
+# ... trigger your app's signup flow with $ADDR ...
+
+ID=$(curl -s -H "Authorization: Bearer $KEY" \
+  "$BASE/inboxes/$ADDR/emails?wait=30" | jq -r '.data[0].id')
+
+curl -s -H "Authorization: Bearer $KEY" "$BASE/emails/$ID" \
+  | jq -r .data.text_body | grep -oE '[0-9]{6}'
+```
+
+</CodeGroup>
+
+<Tip>
+The loop above is not a polling loop in disguise. Each iteration blocks
+server-side for up to 30 seconds, so a 60-second budget costs you two requests,
+not sixty. The reason it loops at all is to survive a `wait` that times out with
+nothing to report. [Read the cursor contract](/waiting-for-mail) before adapting
+it.
+</Tip>

@@ -1,0 +1,52 @@
+---
+title: "Rate limits"
+description: "Two tiers, two windows, and the headers that let you self-throttle."
+icon: "gauge"
+---
+
+| Tier | Per minute | Per day | Concurrent waits |
+|---|---|---|---|
+| Anonymous (per IP) | 60 | 1,000 | — |
+| Free key (per key) | 300 | 10,000 | 5 |
+
+Both windows apply. Staying under the per-minute limit does not exempt you from
+the daily quota.
+
+## Read the headers instead of guessing
+
+Every response carries the current state, so you never have to discover a limit
+by being refused:
+
+```
+ratelimit-limit: 300
+ratelimit-remaining: 297
+ratelimit-reset: 60
+```
+
+A `429` additionally carries `retry-after` in seconds. Honour it — retrying
+sooner just burns quota against a closed window.
+
+## Why anonymous callers should still get a key
+
+Anonymous requests are bucketed **by IP**. CI runners, serverless functions, and
+corporate NATs share egress addresses, which means unrelated users throttle each
+other and you cannot tell your own traffic from theirs.
+
+A key gives you a private bucket at 5× the rate. That is the honest reason to get
+one, and it is why we do not need to force it.
+
+<Note>
+Service discovery (`GET /api/v1`), the OpenAPI spec, and `GET /api/v1/health` sit
+**outside** the developer quota. A caller who has just been rate-limited must
+still be able to read the endpoint that explains why, and a monitoring system
+polling health should not exhaust a budget shared with its neighbours.
+</Note>
+
+## Need more?
+
+Limits are per-key, so raising yours is a one-line change on our side. Email
+[dev.jaythorat@gmail.com](mailto:dev.jaythorat@gmail.com?subject=MeowMail%20API)
+with your key prefix and what you are building.
+
+Tell us what you need rather than working around the limit by minting keys in
+bulk — that reads as abuse from our side and gets the whole IP revoked.
