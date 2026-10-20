@@ -27,6 +27,10 @@
             "pages": ["introduction", "quickstart", "authentication"]
           },
           {
+            "group": "AI assistants (MCP)",
+            "pages": ["mcp", "mcp-tools"]
+          },
+          {
             "group": "Core concepts",
             "pages": ["waiting-for-mail", "response-shapes", "errors"]
           },
@@ -49,6 +53,10 @@
   },
   "navbar": {
     "links": [
+      {
+        "label": "Use with ChatGPT & Claude",
+        "href": "/mcp"
+      },
       {
         "label": "OpenAPI spec",
         "href": "https://api.meowmail.in/api/v1/openapi.json"

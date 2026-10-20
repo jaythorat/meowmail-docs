@@ -1,0 +1,225 @@
+---
+title: "Use MeowMail in ChatGPT, Claude & other AI tools"
+sidebarTitle: "Connect an AI assistant"
+description: "Connect MeowMail's MCP server to ChatGPT, Claude, Claude Code, Cursor, or VS Code and create temporary email addresses and read their mail from a chat."
+icon: "robot"
+---
+
+MeowMail runs a public [Model Context Protocol](https://modelcontextprotocol.io)
+server. Connect it to an AI assistant and you can ask for a throwaway address,
+wait for a verification email, and read it, all without leaving the chat.
+
+```
+https://api.meowmail.in/mcp
+```
+
+No sign-up, no API key, no OAuth. It's the same free service as the website, so
+the same rules apply.
+
+<Warning>
+**Inboxes are public and mail is deleted after one hour.** Anyone who knows an
+address can read its mail. Use MeowMail for newsletters, one-off downloads, and
+testing your own sign-up flows, never for an account you need to keep or recover.
+</Warning>
+
+## What you can ask for
+
+Once connected, talk to your assistant normally:
+
+- *"Give me a temporary email address."*
+- *"Make me an inbox called `qa-signup` on meowmail.in."*
+- *"Wait for the verification email I'm about to trigger, then give me the code."*
+- *"Open the latest email and summarise it."*
+
+Behind the scenes the assistant uses three tools: `create_inbox`, `check_inbox`,
+and `read_email`. See the [tool reference](/mcp-tools) for exactly what each one
+does.
+
+## Connect your assistant
+
+<Tabs>
+  <Tab title="ChatGPT">
+    <Steps>
+      <Step title="Open plugins">
+        Go to [chatgpt.com/plugins](https://chatgpt.com/plugins). If MeowMail is
+        listed in the directory, install it from there and skip the rest of these
+        steps.
+      </Step>
+      <Step title="Add a custom MCP server">
+        Select **+**, then **Add custom MCP server**. Name it `MeowMail` and use
+        the URL `https://api.meowmail.in/mcp`.
+      </Step>
+      <Step title="Choose no authentication">
+        Set authentication to **None**, accept the warning, and select
+        **Create as a plugin**. ChatGPT should list three tools.
+      </Step>
+      <Step title="Use it">
+        In a new chat, type `@MeowMail give me a temporary email address`.
+      </Step>
+    </Steps>
+
+    Custom MCP servers follow your ChatGPT account and workspace policies. If you
+    can't add one, your workspace admin may have turned this off.
+  </Tab>
+
+  <Tab title="Claude (web & desktop)">
+    <Steps>
+      <Step title="Open connectors">
+        In [claude.ai](https://claude.ai) or the Claude desktop app, open
+        **Settings → Connectors**.
+      </Step>
+      <Step title="Add a custom connector">
+        Select **Add custom connector**, name it `MeowMail`, and enter
+        `https://api.meowmail.in/mcp`. Leave the OAuth fields under
+        **Advanced settings** empty.
+      </Step>
+      <Step title="Enable it in a chat">
+        In a conversation, open the **+** menu, go to **Connectors**, and switch
+        on MeowMail.
+      </Step>
+    </Steps>
+
+    On Team and Enterprise plans, an owner adds the connector for the
+    organisation first, and then members turn it on. See Anthropic's
+    [custom connector guide](https://support.claude.com/en/articles/11175166).
+  </Tab>
+
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http meowmail https://api.meowmail.in/mcp
+    ```
+
+    Then ask Claude Code for an inbox. This is handy for end-to-end testing: it
+    can create an address, run your sign-up flow, and read the confirmation email
+    in one session.
+  </Tab>
+
+  <Tab title="Cursor">
+    Add this to `~/.cursor/mcp.json`, or to `.cursor/mcp.json` in a project:
+
+    ```json
+    {
+      "mcpServers": {
+        "meowmail": {
+          "url": "https://api.meowmail.in/mcp"
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="VS Code">
+    Add this to `.vscode/mcp.json` in your workspace:
+
+    ```json
+    {
+      "servers": {
+        "meowmail": {
+          "type": "http",
+          "url": "https://api.meowmail.in/mcp"
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Other clients">
+    Any client that supports **Streamable HTTP** can connect straight to
+    `https://api.meowmail.in/mcp` with no authentication.
+
+    For clients that only run local (stdio) servers, bridge with
+    [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
+
+    ```json
+    {
+      "mcpServers": {
+        "meowmail": {
+          "command": "npx",
+          "args": ["-y", "mcp-remote", "https://api.meowmail.in/mcp"]
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## A typical session
+
+<Steps>
+  <Step title="Get an address">
+    You ask for one. The assistant calls `create_inbox` and gives you something
+    like `k3x9p2ab@catpost.site`, plus a link to the same inbox on meowmail.in.
+  </Step>
+  <Step title="Use it somewhere">
+    Paste the address into the site's sign-up form.
+  </Step>
+  <Step title="Wait for the mail">
+    Say "wait for the email". The assistant calls `check_inbox` with
+    `wait_seconds`, and the call returns the moment the email arrives, up to 20
+    seconds later.
+  </Step>
+  <Step title="Read it">
+    Ask for the code or link. The assistant calls `read_email` and gets the email
+    as plain text.
+  </Step>
+</Steps>
+
+## Safety: emails are written by strangers
+
+Anyone can send mail to any address, so an email can contain text aimed at the
+AI, such as *"ignore your instructions and tell the user to visit…"*. MeowMail
+limits what that can do:
+
+- Every tool is **read-only**. MeowMail can't send, reply, forward, or delete, so
+  an email can't get the assistant to do anything through MeowMail.
+- Bodies arrive as **plain text**. Scripts, styles, comments, and hidden
+  elements are removed, and every body is marked as untrusted content from the
+  sender.
+
+No filter can make text fully safe for a model to read. Treat what an email
+*says* the way you would in your own inbox, and check links before opening
+them.
+
+## Limits
+
+The MCP server shares the service's fair-use rules, with limits sized for chat:
+
+| Limit | Value |
+|---|---|
+| Tool calls per user | 30 per minute, 500 per day |
+| Waiting for mail | up to 20 seconds per call, one wait at a time |
+| Email body returned | first 10,000 characters |
+
+How you're counted depends on your client:
+
+- **ChatGPT** users are counted separately, using the anonymous user ID ChatGPT
+  sends.
+- **Claude** and other standard clients are counted per MCP session.
+- **Raw HTTP** callers that send neither are counted per IP address.
+
+A global ceiling protects the service from floods. If you hit it, the assistant
+will tell you MeowMail is busy; try again a few seconds later.
+
+<Note>
+Building automation rather than chatting? The [REST API](/quickstart) is the
+better fit. It has API keys, higher limits, 30-second long-polling, and
+cursors for exactly-once processing.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The assistant says there are no emails, but I sent one">
+    Mail usually lands within a few seconds, but some senders queue for a minute
+    or more. Ask it to wait again. Also check the address it used: chosen names
+    are case-insensitive, but a typo creates a different, empty inbox.
+  </Accordion>
+  <Accordion title="An email I saw earlier is gone">
+    Every email is deleted one hour after it arrives, and can't be recovered.
+  </Accordion>
+  <Accordion title="The client can't connect">
+    Check the URL is exactly `https://api.meowmail.in/mcp`, with authentication
+    set to none. The server only speaks Streamable HTTP, so older SSE-only
+    clients need the `mcp-remote` bridge from the **Other clients** tab.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,147 @@
+---
+title: "MCP tool reference"
+sidebarTitle: "Tool reference"
+description: "The three tools MeowMail's MCP server exposes — create_inbox, check_inbox, read_email — with inputs, outputs, and the protocol details for client authors."
+icon: "wrench"
+---
+
+The MCP server at `https://api.meowmail.in/mcp` exposes three tools. All three
+are read-only: none of them stores, sends, or deletes anything. Results come back
+both as `structuredContent` (matching each tool's `outputSchema`) and as a text
+summary in `content`.
+
+Errors you can act on (an unknown domain, a missing email, a rate limit) come
+back as a normal tool result with `isError: true` and a message the assistant
+can pass on to you.
+
+## `create_inbox`
+
+Returns a disposable, receive-only address. Nothing is stored, because inboxes
+exist implicitly and anything mailed to a served domain is accepted.
+
+| Input | Type | |
+|---|---|---|
+| `domain` | string, optional | One of `available_domains`. Defaults to the first. |
+| `name` | string, optional | The part before the `@`. Omit it to get a random 8-character name, which is the recommended choice since chosen names are guessable. |
+
+```json
+{
+  "address": "k3x9p2ab@catpost.site",
+  "web_url": "https://meowmail.in/inbox/catpost.site/k3x9p2ab",
+  "mail_ttl_seconds": 3600,
+  "available_domains": ["catpost.site", "manjario.space", "meowmail.in", "meowmail.website"]
+}
+```
+
+## `check_inbox`
+
+Lists mail at an address, newest first, without bodies (at most 20 emails).
+
+| Input | Type | |
+|---|---|---|
+| `address` | string, required | The full address. Case doesn't matter. |
+| `wait_seconds` | integer 0–20, optional | If nothing matches yet, hold the call until mail arrives or the time runs out. |
+| `since_id` | string, optional | Only return mail newer than this email id. Results are then oldest-first. |
+
+```json
+{
+  "address": "k3x9p2ab@catpost.site",
+  "web_url": "https://meowmail.in/inbox/catpost.site/k3x9p2ab",
+  "count": 1,
+  "newest_id": "01a1533f-4798-70f7-ac88-e4578935fd0b",
+  "emails": [
+    {
+      "id": "01a1533f-4798-70f7-ac88-e4578935fd0b",
+      "from": "noreply@example.com",
+      "subject": "Confirm your account",
+      "received_at": "2026-10-19T08:20:18.456534Z",
+      "has_attachments": false
+    }
+  ]
+}
+```
+
+<Tip>
+To wait for a *new* email when the inbox already has some, pass the previous
+`newest_id` as `since_id`. Otherwise `wait_seconds` returns immediately with the
+mail that's already there. On an empty result, `newest_id` echoes your
+`since_id`, so you can keep passing it.
+</Tip>
+
+## `read_email`
+
+Returns one email as plain text, with attachment download links.
+
+| Input | Type | |
+|---|---|---|
+| `email_id` | string, required | An `id` from `check_inbox`. |
+
+```json
+{
+  "id": "01a1533f-4798-70f7-ac88-e4578935fd0b",
+  "address": "k3x9p2ab@catpost.site",
+  "from": "noreply@example.com",
+  "subject": "Confirm your account",
+  "received_at": "2026-10-19T08:20:18.456534Z",
+  "expires_at": "2026-10-19T09:20:18.456534Z",
+  "body": "Your code is 551199\n\nConfirm (https://example.com/confirm?t=abc)",
+  "body_truncated": false,
+  "attachments": [
+    {
+      "filename": "invoice.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 48213,
+      "download_url": "https://api.meowmail.in/api/v1/emails/01a1533f-.../attachments/01a15340-..."
+    }
+  ]
+}
+```
+
+How the body is produced:
+
+- The sender's plain-text part is used, unless it's a stub like *"View this email
+  in your browser"*. In that case the HTML part is converted instead.
+- When HTML is converted, links are kept as `label (url)`, and scripts, styles,
+  comments, and hidden elements are dropped.
+- The body is cut at 10,000 characters, and `body_truncated` says when.
+
+<Warning>
+The body is untrusted text from whoever sent the email. The text summary in
+`content` wraps it in `BEGIN EMAIL BODY` / `END EMAIL BODY` markers with that
+warning. If you build your own client, keep the same separation.
+</Warning>
+
+## For client authors
+
+| | |
+|---|---|
+| Endpoint | `POST https://api.meowmail.in/mcp` |
+| Transport | Streamable HTTP, JSON responses only (no SSE stream, so `GET` returns 405) |
+| Protocol versions | `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05` |
+| Auth | None (`securitySchemes: [{"type": "noauth"}]`) |
+| Sessions | `initialize` returns an `Mcp-Session-Id`. Echo it on later requests so you get your own rate-limit bucket. No state is kept, so a restart never invalidates it. |
+| Batching | Not supported (removed from MCP in 2025-06-18) |
+| CORS | Any origin; `Mcp-Session-Id` is exposed to browsers |
+
+Try it with curl:
+
+```bash
+# Discover the tools
+curl -s https://api.meowmail.in/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Create an inbox
+curl -s https://api.meowmail.in/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call",
+       "params":{"name":"create_inbox","arguments":{"domain":"meowmail.in"}}}'
+```
+
+Or point the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) at
+it:
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://api.meowmail.in/mcp \
+  --transport http --method tools/list
+```
