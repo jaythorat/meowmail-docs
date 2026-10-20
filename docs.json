@@ -28,7 +28,7 @@
           },
           {
             "group": "AI assistants (MCP)",
-            "pages": ["mcp", "mcp-tools"]
+            "pages": ["ai-assistants", "mcp-tools"]
           },
           {
             "group": "Core concepts",
@@ -55,7 +55,7 @@
     "links": [
       {
         "label": "Use with ChatGPT & Claude",
-        "href": "/mcp"
+        "href": "/ai-assistants"
       },
       {
         "label": "OpenAPI spec",

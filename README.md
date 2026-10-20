@@ -44,10 +44,15 @@ a second copy of the spec alongside the docs and it drifted within a day.
 | Guide prose, navigation, theme | **Here**, in the `.mdx` files and `docs.json` |
 | Endpoint schemas, parameters, response shapes | The service repo, in `priv/openapi.json` — never here |
 | Anything about how the API behaves | The service repo |
-| MCP tool names, inputs, outputs, limits | The service repo (`lib/meowmail_web/mcp/`); then update `mcp.mdx` / `mcp-tools.mdx` here by hand. They're not generated, so they can drift. |
+| MCP tool names, inputs, outputs, limits | The service repo (`lib/meowmail_web/mcp/`); then update `ai-assistants.mdx` / `mcp-tools.mdx` here by hand. They're not generated, so they can drift. |
 
 If you are editing an endpoint's request or response documentation and you are in
 this repo, you are in the wrong place.
+
+## Reserved paths
+
+Mintlify serves its own docs MCP server at `/mcp`, so no page can live there; the
+MeowMail MCP guide is `ai-assistants.mdx` for that reason.
 
 ## Local preview
 
